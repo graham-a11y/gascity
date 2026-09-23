@@ -940,7 +940,7 @@ case "$query" in
       print_cell ""
       exit 0
     fi
-    if { [ "$mode" = "row_count_and_hash_diverges" ] || [ "$mode" = "same_table_replacement_with_row_gain" ] || [ "$mode" = "mixed_row_count_gain_and_same_count_hash_drift" ] || [ "$mode" = "writer_race_before_flatten" ] || [ "$mode" = "remote_writer_race_before_flatten" ] || [ "$mode" = "writer_race_during_verify" ] || [ "$mode" = "writer_race_with_mixed_same_count_hash_drift" ] || [ "$mode" = "row_count_decreases_with_writer_race" ] || [ "$mode" = "row_count_decreases_with_hash_change" ] || [ "$mode" = "same_count_hash_drift_with_writer_race" ]; } && [ "$(current_head)" = "compactcommit" ]; then
+    if { [ "$mode" = "row_count_and_hash_diverges" ] || [ "$mode" = "same_table_replacement_with_row_gain" ] || [ "$mode" = "mixed_row_count_gain_and_same_count_hash_drift" ] || [ "$mode" = "writer_race_before_flatten" ] || [ "$mode" = "remote_writer_race_before_flatten" ] || [ "$mode" = "writer_race_during_verify" ] || [ "$mode" = "writer_race_with_mixed_same_count_hash_drift" ] || [ "$mode" = "row_count_decreases_with_writer_race" ] || [ "$mode" = "row_count_decreases_with_hash_change" ] || [ "$mode" = "same_count_hash_drift_with_writer_race" ] || [ "$mode" = "mixed_gain_and_same_count_hash_drift_additive" ] || [ "$mode" = "mixed_gain_and_same_count_hash_drift_diff_fails" ]; } && [ "$(current_head)" = "compactcommit" ]; then
       print_cell hash-beads-after-writer
       exit 0
     fi
@@ -952,7 +952,7 @@ case "$query" in
     exit 0
     ;;
   *"DOLT_HASHOF_TABLE('notes')"*)
-    if { [ "$mode" = "mixed_row_count_gain_and_same_count_hash_drift" ] || [ "$mode" = "writer_race_with_mixed_same_count_hash_drift" ] || [ "$mode" = "same_count_hash_drift_then_probe_failure" ] || [ "$mode" = "probe_failure_then_same_count_hash_drift" ]; } && [ "$(current_head)" = "compactcommit" ]; then
+    if { [ "$mode" = "mixed_row_count_gain_and_same_count_hash_drift" ] || [ "$mode" = "writer_race_with_mixed_same_count_hash_drift" ] || [ "$mode" = "same_count_hash_drift_then_probe_failure" ] || [ "$mode" = "probe_failure_then_same_count_hash_drift" ] || [ "$mode" = "mixed_gain_and_same_count_hash_drift_additive" ] || [ "$mode" = "mixed_gain_and_same_count_hash_drift_diff_fails" ]; } && [ "$(current_head)" = "compactcommit" ]; then
       print_cell hash-notes-after-writer
       exit 0
     fi
@@ -1090,7 +1090,7 @@ case "$query" in
       print_cell blocked_issues
       exit 0
     fi
-    if [ "$mode" = "mixed_row_count_gain_and_same_count_hash_drift" ] || [ "$mode" = "writer_race_with_mixed_same_count_hash_drift" ]; then
+    if [ "$mode" = "mixed_row_count_gain_and_same_count_hash_drift" ] || [ "$mode" = "writer_race_with_mixed_same_count_hash_drift" ] || [ "$mode" = "mixed_gain_and_same_count_hash_drift_additive" ] || [ "$mode" = "mixed_gain_and_same_count_hash_drift_diff_fails" ]; then
       print_cells beads notes
       exit 0
     fi
@@ -1150,10 +1150,32 @@ case "$query" in
     # same-count-hash-drift defer). A zero count means the flatten commit
     # itself never touched the table's rows.
     case "$mode" in
-      writer_race_same_count_hash_drift_only|same_count_hash_drift_with_writer_race)
+      writer_race_same_count_hash_drift_only|same_count_hash_drift_with_writer_race|mixed_gain_and_same_count_hash_drift_additive|mixed_gain_and_same_count_hash_drift_diff_fails)
         print_cell 0
         ;;
       writer_race_same_count_hash_drift_diff_fails)
+        print_cell 1
+        ;;
+      *)
+        printf 'unexpected DOLT_DIFF query: %%s\n' "$query" >&2
+        exit 64
+        ;;
+    esac
+    exit 0
+    ;;
+  *"DOLT_DIFF("*"'notes')"*)
+    # Same ordering requirement as the 'beads' arm above: this query's text
+    # also matches "SELECT COUNT(*) FROM"*"notes"*, so it must be dispatched
+    # before that generic arm. Content diff of table "notes" between the
+    # pre-flight snapshot HEAD and the flatten's own commit, used by the
+    # mixed-signature preservation proof (sc-w0jlr6): gain+drift on "beads"
+    # together with same-count hash drift on "notes" in one verify_counts
+    # pass must prove additive-only across BOTH drifting tables to defer.
+    case "$mode" in
+      mixed_gain_and_same_count_hash_drift_additive)
+        print_cell 0
+        ;;
+      mixed_gain_and_same_count_hash_drift_diff_fails)
         print_cell 1
         ;;
       *)
@@ -1200,7 +1222,7 @@ case "$query" in
       printf 'row count exploded after flatten\n' >&2
       exit 47
     fi
-    if { [ "$mode" = "row_count_gain_with_stable_hashes" ] || [ "$mode" = "row_count_gain_with_db_hash_drift" ] || [ "$mode" = "row_count_and_hash_diverges" ] || [ "$mode" = "same_table_replacement_with_row_gain" ] || [ "$mode" = "mixed_row_count_gain_and_same_count_hash_drift" ] || [ "$mode" = "writer_race_before_flatten" ] || [ "$mode" = "remote_writer_race_before_flatten" ] || [ "$mode" = "writer_race_during_verify" ] || [ "$mode" = "writer_race_db_hash_during_verify" ] || [ "$mode" = "writer_race_with_mixed_same_count_hash_drift" ]; } && [ "$calls" -gt 1 ]; then
+    if { [ "$mode" = "row_count_gain_with_stable_hashes" ] || [ "$mode" = "row_count_gain_with_db_hash_drift" ] || [ "$mode" = "row_count_and_hash_diverges" ] || [ "$mode" = "same_table_replacement_with_row_gain" ] || [ "$mode" = "mixed_row_count_gain_and_same_count_hash_drift" ] || [ "$mode" = "writer_race_before_flatten" ] || [ "$mode" = "remote_writer_race_before_flatten" ] || [ "$mode" = "writer_race_during_verify" ] || [ "$mode" = "writer_race_db_hash_during_verify" ] || [ "$mode" = "writer_race_with_mixed_same_count_hash_drift" ] || [ "$mode" = "mixed_gain_and_same_count_hash_drift_additive" ] || [ "$mode" = "mixed_gain_and_same_count_hash_drift_diff_fails" ]; } && [ "$calls" -gt 1 ]; then
       print_cell 11
     elif { [ "$mode" = "row_count_decreases" ] || [ "$mode" = "row_count_decreases_with_writer_race" ] || [ "$mode" = "row_count_decreases_with_hash_change" ]; } && [ "$calls" -gt 1 ]; then
       print_cell 9
@@ -2577,6 +2599,83 @@ func TestCompactScriptQuarantinesMixedSignalsDespiteWriterRace(t *testing.T) {
 	pendingGC := filepath.Join(fixture.cityPath, ".gc", "runtime", "packs", "dolt", "compact-pending-gc", "beads")
 	if _, err := os.Stat(pendingGC); !os.IsNotExist(err) {
 		t.Fatalf("mixed hard integrity signals must not write pending-GC marker; stat=%v", err)
+	}
+}
+
+// sc-w0jlr6: one ordinary writer transaction that inserts a row into one
+// table (beads) and updates a row in another (notes) produces BOTH
+// gain+drift and same-count-drift in the same verify_counts pass. Each of
+// the four single-category defer paths above requires every OTHER drift
+// flag to be off, so this mixed signature always fell through to hard
+// quarantine even when both drifting tables are provably additive-only via
+// DOLT_DIFF, and even after PR #6472 pinned every post-flatten read to
+// flatten_head (the pin fixes read-timing races, not this missing
+// defer-path combination). The fifth defer path proves preservation
+// directly across the union of every drifting table and downgrades this
+// exact combination to a defer.
+func TestCompactScriptDefersMixedGainAndSameCountHashDriftProvenAdditive(t *testing.T) {
+	fixture := newCompactScriptFixture(t)
+	out, err := fixture.run(t, "mixed_gain_and_same_count_hash_drift_additive", "GC_DOLT_COMPACT_THRESHOLD_COMMITS=500")
+	if err != nil {
+		t.Fatalf("mixed gain+drift and same-count drift proven additive-only must defer, not fail: %v\n%s", err, out)
+	}
+	if !strings.Contains(out, "table=beads gained rows during flatten") {
+		t.Fatalf("output missing row-count gain evidence:\n%s", out)
+	}
+	if !strings.Contains(out, "table=notes value hash changed after flatten without row-count increase") {
+		t.Fatalf("output missing same-count hash drift warning:\n%s", out)
+	}
+	if !strings.Contains(out, "mixed row-count-gain and same-count table value hash drift proven additive-only via DOLT_DIFF") ||
+		!strings.Contains(out, "deferring, will retry next run") {
+		t.Fatalf("output missing mixed-signature additive-only defer message:\n%s", out)
+	}
+	quarantine := filepath.Join(fixture.cityPath, ".gc", "runtime", "packs", "dolt", "compact-quarantine", "beads")
+	if _, statErr := os.Stat(quarantine); !os.IsNotExist(statErr) {
+		t.Fatalf("mixed signature proven additive-only must NOT write a quarantine marker; stat=%v", statErr)
+	}
+	pendingGC := filepath.Join(fixture.cityPath, ".gc", "runtime", "packs", "dolt", "compact-pending-gc", "beads")
+	if reason := compactMarkerValue(t, pendingGC, "reason"); reason != "writer race during flatten deferred full GC" {
+		t.Fatalf("mixed-signature defer should record pending-GC retry marker, got reason %q", reason)
+	}
+	data, readErr := os.ReadFile(fixture.doltLog)
+	if readErr != nil {
+		t.Fatalf("read fake dolt log: %v", readErr)
+	}
+	if strings.Contains(string(data), "DOLT_GC") {
+		t.Fatalf("mixed-signature defer must skip GC this run:\n%s", string(data))
+	}
+}
+
+// Same mixed gain+drift/same-count-drift signature, but the "notes" table's
+// DOLT_DIFF shows a genuine non-added (removed) row between the pre-flight
+// snapshot and the flatten commit — preservation cannot be proven for every
+// drifting table, so the fifth defer path must NOT apply and the run must
+// still hard-quarantine exactly like the single-category diff-proof-failure
+// cases above.
+func TestCompactScriptQuarantinesMixedGainAndSameCountHashDriftWhenDiffProofFails(t *testing.T) {
+	fixture := newCompactScriptFixture(t)
+	out, err := fixture.run(t, "mixed_gain_and_same_count_hash_drift_diff_fails", "GC_DOLT_COMPACT_THRESHOLD_COMMITS=500")
+	if err == nil {
+		t.Fatalf("compact succeeded despite a failed mixed-signature additive-only diff proof:\n%s", out)
+	}
+	if !strings.Contains(out, "table=beads gained rows during flatten") ||
+		!strings.Contains(out, "table=notes value hash changed after flatten without row-count increase") {
+		t.Fatalf("output missing mixed integrity signals:\n%s", out)
+	}
+	logData, readErr := os.ReadFile(fixture.doltLog)
+	if readErr != nil {
+		t.Fatalf("read dolt log: %v", readErr)
+	}
+	if strings.Contains(string(logData), "DOLT_GC") {
+		t.Fatalf("failed mixed-signature diff proof must block full GC:\n%s", logData)
+	}
+	marker := filepath.Join(fixture.cityPath, ".gc", "runtime", "packs", "dolt", "compact-quarantine", "beads")
+	if reason := compactMarkerValue(t, marker, "reason"); reason != "post-flatten table value hash changed with row-count increase" {
+		t.Fatalf("quarantine reason should identify the first (gain+drift) table failure, got %q", reason)
+	}
+	pendingGC := filepath.Join(fixture.cityPath, ".gc", "runtime", "packs", "dolt", "compact-pending-gc", "beads")
+	if _, statErr := os.Stat(pendingGC); !os.IsNotExist(statErr) {
+		t.Fatalf("failed mixed-signature diff proof must not write a pending-GC retry marker; stat=%v", statErr)
 	}
 }
 
